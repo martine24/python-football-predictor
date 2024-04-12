@@ -69,7 +69,6 @@ def get_wins_last_five_matches(api_key, team_id):
         return 0  # Default to 0 if match data retrieval fails
 
 def is_team_winner(match, team_id):
-    # Replace this with the actual logic to determine if the team won the match
     # For example, you might check if the team is the home team and has more goals than the away team
     home_team_id = match["homeTeam"]["id"]
     away_team_id = match["awayTeam"]["id"]
@@ -157,6 +156,6 @@ def predict_match(api_key):
         return "Failed to get team data. Please check team names and try again."
 
 # Example usage:
-api_key = "f041b710d43f4f6f83d308a4b4ee2fa9"  
+api_key = "f041b710d43f4f6f83dj308a4b4eyu"  
 prediction = predict_match(api_key)
 print(prediction)
