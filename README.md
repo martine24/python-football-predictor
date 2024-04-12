@@ -1,2 +1,2 @@
 # python-football-predictor
-AI FOOTBALL PRESDICTOR
+AI FOOTBALL PREDICTOR
