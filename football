@@ -1,0 +1,162 @@
+import requests
+from fuzzywuzzy import process
+
+def get_team_id(api_key, team_name):
+    url = f"https://api.football-data.org/v2/teams"
+    headers = {"X-Auth-Token": api_key}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        teams = response.json().get("teams", [])
+        team_names = [team['name'] for team in teams]
+        closest_match, _ = process.extractOne(team_name, team_names)
+        
+        # Get the team ID for the closest match
+        closest_match_team = next(team for team in teams if team['name'] == closest_match)
+        return closest_match_team['id']
+    else:
+        print(f"Failed to retrieve team IDs. Status code: {response.status_code}")
+        return None
+
+def get_team_data(api_key, team_id):
+    url = f"https://api.football-data.org/v2/teams/{team_id}"
+    headers = {"X-Auth-Token": api_key}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json().get("team", {})
+    else:
+        print(f"Failed to retrieve team data. Status code: {response.status_code}")
+        return None
+
+def get_head_to_head(api_key, home_team_id, away_team_id):
+    url = f"https://api.football-data.org/v2/teams/{home_team_id}/matches"
+    headers = {"X-Auth-Token": api_key}
+    params = {"status": "FINISHED", "season": "2023"}
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200:
+        matches = response.json().get("matches", [])
+        head_to_head = [match for match in matches if match["awayTeam"]["id"] == away_team_id]
+        return head_to_head
+    else:
+        print(f"Failed to retrieve head-to-head data. Status code: {response.status_code}")
+        return None
+
+def calculate_team_strength(api_key, team_id):
+    # Replace this with actual logic using data from the API
+    wins_last_five_matches = get_wins_last_five_matches(api_key, team_id)
+
+    # You can include other factors or modify the calculation as needed
+    position = get_team_position(api_key, team_id)
+
+    # Combine the factors to calculate the overall strength
+    strength = wins_last_five_matches + position
+    return strength
+
+def get_wins_last_five_matches(api_key, team_id):
+    url = f"https://api.football-data.org/v2/teams/{team_id}/matches"
+    headers = {"X-Auth-Token": api_key}
+    params = {"status": "FINISHED", "limit": 5}
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200:
+        matches = response.json().get("matches", [])
+        wins_last_five_matches = sum(1 for match in matches if is_team_winner(match, team_id))
+        return wins_last_five_matches
+    else:
+        print(f"Failed to retrieve match data. Status code: {response.status_code}")
+        return 0  # Default to 0 if match data retrieval fails
+
+def is_team_winner(match, team_id):
+    # Replace this with the actual logic to determine if the team won the match
+    # For example, you might check if the team is the home team and has more goals than the away team
+    home_team_id = match["homeTeam"]["id"]
+    away_team_id = match["awayTeam"]["id"]
+    is_home_team = team_id == home_team_id
+    home_goals = match["score"]["fullTime"]["homeTeam"]
+    away_goals = match["score"]["fullTime"]["awayTeam"]
+    return (is_home_team and home_goals > away_goals) or (not is_home_team and away_goals > home_goals)
+
+def get_team_position(api_key, team_id):
+    # Replace this with actual logic to get the team's position from the API
+    # For example, you might retrieve the league table and find the team's position
+    return 0  # Placeholder, replace with actual implementation
+
+def calculate_match_probability(home_team_strength, away_team_strength):
+    # Simplified calculation of match outcome probability
+    total_strength = home_team_strength + away_team_strength
+    home_win_probability = home_team_strength / total_strength
+    away_win_probability = away_team_strength / total_strength
+    draw_probability = 1 - (home_win_probability + away_win_probability)
+    return home_win_probability, away_win_probability, draw_probability
+
+def predict_goals(head_to_head_matches):
+    # Simplified calculation of likely number of goals based on head-to-head statistics
+    if not head_to_head_matches:
+        return None
+
+    total_goals = sum(match["score"]["fullTime"]["homeTeam"] + match["score"]["fullTime"]["awayTeam"] for match in head_to_head_matches)
+    average_goals = total_goals / len(head_to_head_matches)
+    return average_goals
+
+def predict_btts(head_to_head_matches):
+    # Simplified calculation of both teams to score (BTTS) probability based on head-to-head statistics
+    if not head_to_head_matches:
+        return None
+
+    btts_count = sum(1 for match in head_to_head_matches if match["score"]["fullTime"]["homeTeam"] > 0 and match["score"]["fullTime"]["awayTeam"] > 0)
+    btts_probability = btts_count / len(head_to_head_matches)
+    return btts_probability
+
+def predict_match(api_key):
+    home_team_name = input("Enter the name of the home team: ")
+    away_team_name = input("Enter the name of the away team: ")
+
+    home_team_id = get_team_id(api_key, home_team_name)
+    away_team_id = get_team_id(api_key, away_team_name)
+
+    if home_team_id and away_team_id:
+        home_team_strength = calculate_team_strength(api_key, home_team_id)
+        away_team_strength = calculate_team_strength(api_key, away_team_id)
+
+        head_to_head_matches = get_head_to_head(api_key, home_team_id, away_team_id)
+
+        if head_to_head_matches:
+            print(f"\nHead-to-Head Matches:")
+            for match in head_to_head_matches:
+                print(f"{match['homeTeam']['name']} {match['score']['fullTime']['homeTeam']} - {match['score']['fullTime']['awayTeam']} {match['awayTeam']['name']}")
+
+        home_win_prob, away_win_prob, draw_prob = calculate_match_probability(home_team_strength, away_team_strength)
+
+        print(f"\nPredicted Probabilities:")
+        print(f"Home Team Win: {home_win_prob:.2%}")
+        print(f"Away Team Win: {away_win_prob:.2%}")
+        print(f"Draw: {draw_prob:.2%}")
+
+        average_goals = predict_goals(head_to_head_matches)
+        btts_probability = predict_btts(head_to_head_matches)
+
+        if average_goals is not None:
+            print(f"\nPredicted Average Goals: {average_goals:.2f}")
+
+        if btts_probability is not None:
+            print(f"Both Teams to Score Probability: {btts_probability:.2%}")
+
+        # Predict the winner based on probabilities
+        if home_win_prob > away_win_prob and home_win_prob > draw_prob:
+            prediction = f"The home team ({home_team_name}) is predicted to win."
+        elif away_win_prob > home_win_prob and away_win_prob > draw_prob:
+            prediction = f"The away team ({away_team_name}) is predicted to win."
+        else:
+            prediction = "The match is predicted to end in a draw."
+
+        return prediction
+
+    else:
+        return "Failed to get team data. Please check team names and try again."
+
+# Example usage:
+api_key = "f041b710d43f4f6f83d308a4b4ee2fa9"  
+prediction = predict_match(api_key)
+print(prediction)
